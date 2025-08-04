@@ -1,0 +1,24 @@
+{
+  "name": "supabase-presence-checker-group",
+  "version": "1.0.0",
+  "main": "index_group.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index_group.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.53.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alvirnputraa/supabase-presence-checker-group.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Alvirnputraa/supabase-presence-checker-group/issues"
+  },
+  "homepage": "https://github.com/Alvirnputraa/supabase-presence-checker-group#readme",
+  "description": ""
+}
