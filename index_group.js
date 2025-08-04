@@ -10,18 +10,18 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-console.log("🚀 Group Chat Presence Checker Service Started (interval 10s, cutoff 15s, safe timing)");
+console.log("🚀 Group Chat Presence Checker Service Started (interval 15s, cutoff 20s, safe timing)");
 
 // ✅ Fungsi update offline untuk user1, user2 & user3 - SAFE timing untuk menghindari false positive
 async function setGroupUsersOffline() {
   try {
-    // ✅ SAFE: Cutoff 15 detik untuk memberikan buffer yang cukup
-    // Flutter ping setiap 5 detik, Railway cek setiap 10 detik dengan cutoff 15 detik
-    // Dalam 15 detik, Flutter akan ping 3 kali (detik ke-5, 10, 15)
+    // ✅ SAFE: Cutoff 20 detik untuk memberikan buffer yang lebih besar
+    // Flutter ping setiap 5 detik, Railway cek setiap 15 detik dengan cutoff 20 detik
+    // Dalam 20 detik, Flutter akan ping 4 kali (detik ke-5, 10, 15, 20)
     // ✅ PERBAIKAN: Gunakan UTC untuk konsistensi dengan Flutter (.toUtc().toISOString())
-    const cutoffTime = new Date(Date.now() - 15000);
+    const cutoffTime = new Date(Date.now() - 20000);
     const cutoff = new Date(cutoffTime.getTime() - (cutoffTime.getTimezoneOffset() * 60000)).toISOString();
-    console.log(`🔍 Mengecek user idle >15s di group_chats... [${new Date().toISOString()}]`);
+    console.log(`🔍 Mengecek user idle >20s di group_chats... [${new Date().toISOString()}]`);
     console.log(`🕐 Cutoff time (UTC): ${cutoff}`);
 
     // ✅ 1. Update user1 jika benar-benar idle - SAFE timing
@@ -32,7 +32,7 @@ async function setGroupUsersOffline() {
         user1_status_ping: `offline@${Date.now()}`,
         user1_status_ping_updated_at: new Date().toISOString()
       })
-      .lt("user1_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (15s)
+      .lt("user1_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
       .eq("user1_status", "online")               // ✅ hanya jika status masih online
       .not("user1_status_ping_updated_at", "is", null) // ✅ pastikan ada timestamp
       .not("user1_status_ping", "like", "offline%")    // ✅ jangan update jika ping sudah offline
@@ -41,10 +41,10 @@ async function setGroupUsersOffline() {
     if (error1) {
       console.error("❌ Gagal update user1 offline:", error1);
     } else if (data1?.length) {
-      console.log(`✅ ${data1.length} user1 idle >15s di-set offline:`);
+      console.log(`✅ ${data1.length} user1 idle >20s di-set offline:`);
       data1.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user1_id} | Last Ping: ${u.user1_status_ping_updated_at}`));
     } else {
-      console.log("✅ Tidak ada user1 idle >15s.");
+      console.log("✅ Tidak ada user1 idle >20s.");
     }
 
     // ✅ 2. Update user2 jika benar-benar idle - SAFE timing
@@ -55,7 +55,7 @@ async function setGroupUsersOffline() {
         user2_status_ping: `offline@${Date.now()}`,
         user2_status_ping_updated_at: new Date().toISOString()
       })
-      .lt("user2_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (15s)
+      .lt("user2_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
       .eq("user2_status", "online")
       .not("user2_status_ping_updated_at", "is", null)
       .not("user2_status_ping", "like", "offline%")
@@ -64,10 +64,10 @@ async function setGroupUsersOffline() {
     if (error2) {
       console.error("❌ Gagal update user2 offline:", error2);
     } else if (data2?.length) {
-      console.log(`✅ ${data2.length} user2 idle >15s di-set offline:`);
+      console.log(`✅ ${data2.length} user2 idle >20s di-set offline:`);
       data2.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user2_id} | Last Ping: ${u.user2_status_ping_updated_at}`));
     } else {
-      console.log("✅ Tidak ada user2 idle >15s.");
+      console.log("✅ Tidak ada user2 idle >20s.");
     }
 
     // ✅ 3. Update user3 jika benar-benar idle - SAFE timing
@@ -78,7 +78,7 @@ async function setGroupUsersOffline() {
         user3_status_ping: `offline@${Date.now()}`,
         user3_status_ping_updated_at: new Date().toISOString()
       })
-      .lt("user3_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (15s)
+      .lt("user3_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
       .eq("user3_status", "online")
       .not("user3_status_ping_updated_at", "is", null)
       .not("user3_status_ping", "like", "offline%")
@@ -87,10 +87,10 @@ async function setGroupUsersOffline() {
     if (error3) {
       console.error("❌ Gagal update user3 offline:", error3);
     } else if (data3?.length) {
-      console.log(`✅ ${data3.length} user3 idle >15s di-set offline:`);
+      console.log(`✅ ${data3.length} user3 idle >20s di-set offline:`);
       data3.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user3_id} | Last Ping: ${u.user3_status_ping_updated_at}`));
     } else {
-      console.log("✅ Tidak ada user3 idle >15s.");
+      console.log("✅ Tidak ada user3 idle >20s.");
     }
 
   } catch (err) {
@@ -98,5 +98,5 @@ async function setGroupUsersOffline() {
   }
 }
 
-// ✅ SAFE: Jalankan setiap 10 detik untuk memberikan waktu cukup
-setInterval(setGroupUsersOffline, 10000);
+// ✅ SAFE: Jalankan setiap 15 detik untuk memberikan waktu lebih cukup
+setInterval(setGroupUsersOffline, 15000);
