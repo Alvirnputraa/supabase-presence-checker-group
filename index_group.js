@@ -18,8 +18,11 @@ async function setGroupUsersOffline() {
     // ✅ SAFE: Cutoff 15 detik untuk memberikan buffer yang cukup
     // Flutter ping setiap 5 detik, Railway cek setiap 10 detik dengan cutoff 15 detik
     // Dalam 15 detik, Flutter akan ping 3 kali (detik ke-5, 10, 15)
-    const cutoff = new Date(Date.now() - 15000).toISOString();
+    // ✅ PERBAIKAN: Gunakan UTC untuk konsistensi dengan Flutter (.toUtc().toISOString())
+    const cutoffTime = new Date(Date.now() - 15000);
+    const cutoff = new Date(cutoffTime.getTime() - (cutoffTime.getTimezoneOffset() * 60000)).toISOString();
     console.log(`🔍 Mengecek user idle >15s di group_chats... [${new Date().toISOString()}]`);
+    console.log(`🕐 Cutoff time (UTC): ${cutoff}`);
 
     // ✅ 1. Update user1 jika benar-benar idle - SAFE timing
     const { data: data1, error: error1 } = await supabase
