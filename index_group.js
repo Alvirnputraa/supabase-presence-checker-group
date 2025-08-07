@@ -12,87 +12,97 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 console.log("🚀 Group Chat Presence Checker Service Started (interval 15s, cutoff 20s, safe timing)");
 
+// Map untuk menyimpan value ping terakhir dan waktu baca
+const lastPingMap = new Map();
+
 // ✅ Fungsi update offline untuk user1, user2 & user3 - SAFE timing untuk menghindari false positive
 async function setGroupUsersOffline() {
   try {
-    // ✅ SAFE: Cutoff 20 detik untuk memberikan buffer yang lebih besar
-    // Flutter ping setiap 5 detik, Railway cek setiap 15 detik dengan cutoff 20 detik
-    // Dalam 20 detik, Flutter akan ping 4 kali (detik ke-5, 10, 15, 20)
-    // ✅ PERBAIKAN: Gunakan UTC untuk konsistensi dengan Flutter (.toUtc().toISOString())
-    const cutoffTime = new Date(Date.now() - 20000);
-    const cutoff = new Date(cutoffTime.getTime() - (cutoffTime.getTimezoneOffset() * 60000)).toISOString();
-    console.log(`🔍 Mengecek user idle >20s di group_chats... [${new Date().toISOString()}]`);
-    console.log(`🕐 Cutoff time (UTC): ${cutoff}`);
-
-    // ✅ 1. Update user1 jika benar-benar idle - SAFE timing
-    const { data: data1, error: error1 } = await supabase
+    const cutoffMs = 20000; // 20 detik
+    const now = Date.now();
+    // Ambil semua user online di group_chats
+    const { data: groups, error } = await supabase
       .from("group_chats")
-      .update({ 
-        user1_status: "offline",
-        user1_status_ping: `offline@${Date.now()}`,
-        user1_status_ping_updated_at: new Date().toISOString()
-      })
-      .lt("user1_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
-      .eq("user1_status", "online")               // ✅ hanya jika status masih online
-      .not("user1_status_ping_updated_at", "is", null) // ✅ pastikan ada timestamp
-      .not("user1_status_ping", "like", "offline%")    // ✅ jangan update jika ping sudah offline
-      .select("id, user1_status_ping_updated_at, user1_id");
-
-    if (error1) {
-      console.error("❌ Gagal update user1 offline:", error1);
-    } else if (data1?.length) {
-      console.log(`✅ ${data1.length} user1 idle >20s di-set offline:`);
-      data1.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user1_id} | Last Ping: ${u.user1_status_ping_updated_at}`));
-    } else {
-      console.log("✅ Tidak ada user1 idle >20s.");
+      .select("id, user1_status, user1_status_ping, user1_id, user2_status, user2_status_ping, user2_id, user3_status, user3_status_ping, user3_id");
+    if (error) {
+      console.error("❌ Gagal ambil data group_chats:", error);
+      return;
     }
-
-    // ✅ 2. Update user2 jika benar-benar idle - SAFE timing
-    const { data: data2, error: error2 } = await supabase
-      .from("group_chats")
-      .update({ 
-        user2_status: "offline",
-        user2_status_ping: `offline@${Date.now()}`,
-        user2_status_ping_updated_at: new Date().toISOString()
-      })
-      .lt("user2_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
-      .eq("user2_status", "online")
-      .not("user2_status_ping_updated_at", "is", null)
-      .not("user2_status_ping", "like", "offline%")
-      .select("id, user2_status_ping_updated_at, user2_id");
-
-    if (error2) {
-      console.error("❌ Gagal update user2 offline:", error2);
-    } else if (data2?.length) {
-      console.log(`✅ ${data2.length} user2 idle >20s di-set offline:`);
-      data2.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user2_id} | Last Ping: ${u.user2_status_ping_updated_at}`));
-    } else {
-      console.log("✅ Tidak ada user2 idle >20s.");
+    // Cek user1
+    for (const g of groups) {
+      if (g.user1_status === "online") {
+        const lastPing = lastPingMap.get(`user1_${g.id}`);
+        if (!lastPing || lastPing.value !== g.user1_status_ping) {
+          lastPingMap.set(`user1_${g.id}`, { value: g.user1_status_ping, time: now });
+          console.log(`🔄 User1 ping berubah: ${g.user1_status_ping} (GroupChatID: ${g.id})`);
+        } else {
+          const elapsed = now - lastPing.time;
+          if (elapsed > cutoffMs) {
+            await supabase
+              .from("group_chats")
+              .update({
+                user1_status: "offline",
+                user1_status_ping: `offline@${Date.now()}`
+              })
+              .eq("id", g.id);
+            console.log(`✅ User1 idle >${cutoffMs/1000}s di-set offline: GroupChatID: ${g.id} | UserID: ${g.user1_id}`);
+            lastPingMap.delete(`user1_${g.id}`);
+          }
+        }
+      } else {
+        lastPingMap.delete(`user1_${g.id}`);
+      }
     }
-
-    // ✅ 3. Update user3 jika benar-benar idle - SAFE timing
-    const { data: data3, error: error3 } = await supabase
-      .from("group_chats")
-      .update({ 
-        user3_status: "offline",
-        user3_status_ping: `offline@${Date.now()}`,
-        user3_status_ping_updated_at: new Date().toISOString()
-      })
-      .lt("user3_status_ping_updated_at", cutoff)  // ✅ hanya jika timestamp < cutoff (20s)
-      .eq("user3_status", "online")
-      .not("user3_status_ping_updated_at", "is", null)
-      .not("user3_status_ping", "like", "offline%")
-      .select("id, user3_status_ping_updated_at, user3_id");
-
-    if (error3) {
-      console.error("❌ Gagal update user3 offline:", error3);
-    } else if (data3?.length) {
-      console.log(`✅ ${data3.length} user3 idle >20s di-set offline:`);
-      data3.forEach(u => console.log(`   • GroupChatID: ${u.id} | UserID: ${u.user3_id} | Last Ping: ${u.user3_status_ping_updated_at}`));
-    } else {
-      console.log("✅ Tidak ada user3 idle >20s.");
+    // Cek user2
+    for (const g of groups) {
+      if (g.user2_status === "online") {
+        const lastPing = lastPingMap.get(`user2_${g.id}`);
+        if (!lastPing || lastPing.value !== g.user2_status_ping) {
+          lastPingMap.set(`user2_${g.id}`, { value: g.user2_status_ping, time: now });
+          console.log(`🔄 User2 ping berubah: ${g.user2_status_ping} (GroupChatID: ${g.id})`);
+        } else {
+          const elapsed = now - lastPing.time;
+          if (elapsed > cutoffMs) {
+            await supabase
+              .from("group_chats")
+              .update({
+                user2_status: "offline",
+                user2_status_ping: `offline@${Date.now()}`
+              })
+              .eq("id", g.id);
+            console.log(`✅ User2 idle >${cutoffMs/1000}s di-set offline: GroupChatID: ${g.id} | UserID: ${g.user2_id}`);
+            lastPingMap.delete(`user2_${g.id}`);
+          }
+        }
+      } else {
+        lastPingMap.delete(`user2_${g.id}`);
+      }
     }
-
+    // Cek user3
+    for (const g of groups) {
+      if (g.user3_status === "online") {
+        const lastPing = lastPingMap.get(`user3_${g.id}`);
+        if (!lastPing || lastPing.value !== g.user3_status_ping) {
+          lastPingMap.set(`user3_${g.id}`, { value: g.user3_status_ping, time: now });
+          console.log(`🔄 User3 ping berubah: ${g.user3_status_ping} (GroupChatID: ${g.id})`);
+        } else {
+          const elapsed = now - lastPing.time;
+          if (elapsed > cutoffMs) {
+            await supabase
+              .from("group_chats")
+              .update({
+                user3_status: "offline",
+                user3_status_ping: `offline@${Date.now()}`
+              })
+              .eq("id", g.id);
+            console.log(`✅ User3 idle >${cutoffMs/1000}s di-set offline: GroupChatID: ${g.id} | UserID: ${g.user3_id}`);
+            lastPingMap.delete(`user3_${g.id}`);
+          }
+        }
+      } else {
+        lastPingMap.delete(`user3_${g.id}`);
+      }
+    }
   } catch (err) {
     console.error("🔥 Error runtime:", err);
   }
